@@ -45,13 +45,14 @@ int SMSensor(){
 		case sensor_wait:
 			if(sensor1){//when the "outfield" sensor detects the ball increase the score
 				state = sensor_on;
-				SPI_MasterTransmit(score);//should send codes to tell the LCD whether its a score or a strike
+				SPI_MasterTransmit(0x01);//should send codes to tell the LCD whether its a score or a strike
 			}
 			else if(sensor2){//when the "strike zone" sensor detects the ball gives a strike
-				state = sensor_decrement;
-				SPI_MasterTransmit(strikes);//should send codes to tell the LCD whether its a score or a strike
+			//	state = sensor_decrement;
+				//SPI_MasterTransmit(strikes);//should send codes to tell the LCD whether its a score or a strike
 			}
 			else{
+				
 				state = sensor_wait;	
 			}
 			
@@ -65,6 +66,7 @@ int SMSensor(){
 				state = sensor_on;
 			}
 			else{
+				SPI_MasterTransmit(0x00);
 				PORTA = 0x00;
 				state = sensor_wait;
 			}
