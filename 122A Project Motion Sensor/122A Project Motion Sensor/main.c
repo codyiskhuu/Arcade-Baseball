@@ -49,7 +49,7 @@ int SMSensor(){
 			}
 			else if(sensor2){//when the "strike zone" sensor detects the ball gives a strike
 			//	state = sensor_decrement;
-				//SPI_MasterTransmit(strikes);//should send codes to tell the LCD whether its a score or a strike
+			//SPI_MasterTransmit(strikes);//should send codes to tell the LCD whether its a score or a strike
 			}
 			else{
 				

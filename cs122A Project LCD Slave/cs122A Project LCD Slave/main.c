@@ -22,50 +22,287 @@ typedef struct _task{
 
 //////////////////////////////////////////////////////////////////////////
 /*Variables Used for the Sensor State*/
-#define one 0x03
-#define two 0x0C
-#define three 0x30
-#define four 0xC0
-char PORT_B[]= {0,0,0,0,0,0,0,0,0,0,0,0,  two, two,four, four, two, two, four, four, two, two, 0, two, two, two,two,one,one,one,one, 0,0,0,0,0,0,0,0,0,0,one, one,three, three, one, one, three, three, one, one, 0,  one, one, two,two, three,three,three,three, 0,0,0,0,0,0,0,0,0,0,three,three, two,two,three,three,two,two,three,three,0, four,four, four,0,one,one,0,0,one,one,0,0,one,one,0,0,one,one,0,0,one,one,0,0,one,one,one,one
-	,0,0,0,0,0,0,0,0,0,0,0
 
-};			//0x01, 0x03
-char PORT_C[8] = {1,2,4,8,16,32,64,128}; //pin values of a port 2^0,2^1,2^2??2^7
+				// 0        1      2         3       4        5         6     7      8       9   10     11      12    13       14    15      16     17      18   19     20    21      22
+char outfield[] = {1,1,1,  0,1,1,  1,1,0,  1,0,1,   1,1,0,  1,1,1,    0,0,1, 1,1,1, 1,0,1, 0,1,0, 1,1,1, 0,1,1, 0,1,1, 1,1,1, 1,0,1, 1,1,1, 0,1,1, 0,1,0, 1,0,1, 0,1,0, 1,1,1, 0,0,1, 1,0,0};
+				// 0 1 2  3 4 5  6 7 8  9 10 11
+//char outfield[] = {1,1,1};
+unsigned char outter = 0;// no bigger than 22
+
 unsigned char score = 0;
+unsigned char hi_score = 0;
 
+unsigned char left_num = 0;	//outfield[outter];
+unsigned char mid_num =	0;	//outfield[outter + 1];
+unsigned char right_num = 0;//outfield[outter + 2];
+
+
+unsigned char first_base = 0;
+unsigned char second_base = 0;
+unsigned char third_base = 0;
+unsigned char home_base = 0;
+
+unsigned char strike = 0;
+/*
+++first_base;
+if(first_base == 2){
+	first_base = 1;
+	++second_base;
+}
+if(second_base == 2){
+	second_base = 1;
+	++third_base;
+}
+if(thrid_base == 2){
+	thrid_base = 0;
+	++home_base;
+}
+if(home_base == 1){
+	++score;
+	home_base = 0;
+}
+
+*/
 enum SM1_states{screen_Init, screen_wait, screen_increase, screen_decrease};
 int SMLCD(int state){
 	switch(state){
 		case screen_Init:
+				left_num = outfield[outter];
+				mid_num = outfield[outter + 1];
+				right_num = outfield[outter + 2];
 			state = screen_wait;
 			return state;
 		break;
 		
 		case screen_wait:
-			if(receivedData == 0x01){
+			if(receivedData == 0x01){//menu state
+				receivedData = 0x00;
+				LCD_ClearScreen();
+				LCD_DisplayString(1, "Oh! That's a    Baseball L2Start");
+			}
+			if( receivedData == 0x02){//game state
+				left_num = outfield[outter];
+				mid_num = outfield[outter + 1];
+				right_num = outfield[outter + 2];
+				receivedData = 0x00;
+				LCD_ClearScreen();
+				LCD_DisplayString(1, "Score: 0        Strikes: 0");
+			}
+			else if( receivedData == 0x03){//end game
+				LCD_ClearScreen();
+				receivedData = 0x00;
+				LCD_DisplayString(1, "Your Score:     High Score: ");
+				LCD_Cursor(13);
+				LCD_WriteData(score + '0');//only single digit
+				//LCD_DisplayString(1, "   High Score: ");
+				LCD_Cursor(29);
+				LCD_WriteData(hi_score + '0');//only single digit		
+				score = 0;		
+			}
+			else if( receivedData == 0x04){//high score
+				LCD_ClearScreen();
+				LCD_DisplayString(1, "High Score: ");
+				LCD_Cursor(13);
+				hi_score = eeprom_read_byte((uint8_t*)1);
+				LCD_WriteData(hi_score + '0');//only single digit
 				
-				state = screen_increase;
-				score++;
-				LCD_Cursor(14);
-				LCD_WriteData(score +'0');
-				eeprom_update_byte((uint8_t*) 1, (uint8_t) score);
+			}
+			else if( receivedData == 0x10){//left
+
+				receivedData = 0x00;
+				if(left_num == 0){//foul
+					strike += 1;
+					LCD_Cursor(26);
+					LCD_WriteData(strike + '0');
+					state = screen_decrease;
+				}
+				else{//point 
+					++first_base;
+					if(first_base == 2){
+						first_base = 1;
+						++second_base;
+					}
+					if(second_base == 2){
+						second_base = 1;
+						++third_base;
+					}
+					if(third_base == 2){
+						third_base = 0;
+						++home_base;
+					}
+					if(home_base == 1){
+						++score;
+						home_base = 0;
+					}
+					//score += 1;
+					LCD_Cursor(8);
+					LCD_WriteData(score + '0');
+					state = screen_increase;
+				}
+				
+				outter += 3;
+				if(outter > 66 ){
+					outter = 0;
+				}
+				
+				left_num = outfield[outter];
+				mid_num = outfield[outter + 1];
+				right_num = outfield[outter + 2];
+				
+				if(strike == 3){
+					if(hi_score < score){
+						eeprom_update_byte((uint8_t*) 1, (uint8_t) score);
+					}
+					state = screen_wait;
+					receivedData = 0x03;
+				}
+			}
+			else if( receivedData == 0x11){//mid
+				receivedData = 0x00;
+				
+
+				if(mid_num == 0){
+					strike += 1;
+					LCD_Cursor(26);
+					LCD_WriteData(strike + '0');
+					state = screen_decrease;
+				}
+				else{
+					++first_base;
+					if(first_base == 2){
+						first_base = 1;
+						++second_base;
+					}
+					if(second_base == 2){
+						second_base = 1;
+						++third_base;
+					}
+					if(third_base == 2){
+						third_base = 0;
+						++home_base;
+					}
+					if(home_base == 1){
+						++score;
+						home_base = 0;
+					}					
+					//score += 1;
+					LCD_Cursor(8);
+					LCD_WriteData(score + '0');
+					state = screen_increase;
+				}
+				
+				outter += 3;
+				if(outter > 66 ){
+					outter = 0;
+				}
+				left_num = outfield[outter];
+				mid_num = outfield[outter + 1];
+				right_num = outfield[outter + 2];
+				if(strike == 3){
+					if(hi_score < score){
+						eeprom_update_byte((uint8_t*) 1, (uint8_t) score);
+					}
+					state = screen_wait;
+					receivedData = 0x03;
+				}
+			}
+			else if( receivedData == 0x12){//right
+				receivedData = 0x00;
+				
+
+				if(right_num == 0){
+					strike += 1;
+					LCD_Cursor(26);
+					LCD_WriteData(strike + '0');
+					state = screen_decrease;
+				}
+				else{
+					++first_base;
+					if(first_base == 2){
+						first_base = 1;
+						++second_base;
+					}
+					if(second_base == 2){
+						second_base = 1;
+						++third_base;
+					}
+					if(third_base == 2){
+						third_base = 0;
+						++home_base;
+					}
+					if(home_base == 1){
+						++score;
+						home_base = 0;
+					}
+					//score += 1;
+					LCD_Cursor(8);
+					LCD_WriteData(score + '0');
+					state = screen_increase;
+				}
+				outter += 3;
+				if(outter > 66 ){
+					outter = 0;
+				}
+				left_num = outfield[outter];
+				mid_num = outfield[outter + 1];
+				right_num = outfield[outter + 2];
+				if(strike == 3){
+					if(hi_score < score){
+						eeprom_update_byte((uint8_t*) 1, (uint8_t) score);
+					}
+					state = screen_wait;
+					receivedData = 0x03;
+				}
+				
+			}
+			else if( receivedData == 0x13){//strike
+				receivedData = 0x00;
+
+					strike += 1;
+					LCD_Cursor(26);
+					LCD_WriteData(strike + '0');	
+					outter += 3;
+					if(outter > 66 ){
+						outter = 0;
+					}
+					left_num = outfield[outter];
+					mid_num = outfield[outter + 1];
+					right_num = outfield[outter + 2];
+					if(strike == 3){
+						if(hi_score < score){
+							eeprom_update_byte((uint8_t*) 1, (uint8_t) score);
+						}
+						state = screen_wait;
+						receivedData = 0x03;
+					}
+					else{
+						state = screen_decrease;
+					}					
+										
+
+				
+				
 			}
 			else{
-
+				receivedData = 0x00;
 				//PORTC = PORT_C[1];//rows
 				//PORTB = ~PORT_B[8];//column
-				//PORTC = ~0xFF;
-				//PORTB = 0xFF;
-				LCD_Cursor(14);
-				LCD_WriteData(score +'0');
+
+				//LCD_Cursor(14);
+				//LCD_WriteData(score +'0');
+				left_num = outfield[outter];
+				mid_num = outfield[outter + 1];
+				right_num = outfield[outter + 2];
 				state = screen_wait;
+				//score = 0;
+				//eeprom_update_byte((uint8_t*) 1, (uint8_t) score);//manual reset for score will add more things later
 			}
 			
 			return state;		
 		break;
 		
 		case screen_increase:
-			if(receivedData == 0x01){
+			if(receivedData == 0x10 | receivedData == 0x11 | receivedData == 0x12){
 				receivedData = 0x00;				
 				state = screen_increase;
 			}
@@ -76,7 +313,14 @@ int SMLCD(int state){
 		break;
 		
 		case screen_decrease:
-			state = screen_wait;
+			if(receivedData == 0x13){
+				receivedData = 0x00;
+				state = screen_decrease;
+			}
+			else{
+				state = screen_wait;
+			}
+			
 			return state;
 		break;
 	};
@@ -99,13 +343,118 @@ int SMLCD(int state){
 }
 
 
+
+//////////////////////////////////////////////////////////////////////////
+/*
+PORTC = ~0x92; PORTA = 0x80;
+
+PORTC = ~0x10; PORTA = 0x40;
+
+PORTC = ~0x28; PORTA = 0x20;
+
+PORTC = ~0x44; PORTA = 0x10;
+
+PORTC = ~0x28; PORTA = 0x08;
+
+PORTC = ~0x10; PORTA = 0x04;
+*/
+unsigned char counter = 0;
+unsigned char field = 0x00;
+enum SM2_states{matrix_Init, matrix_wait, matrix_game}state_matrix;
+int SMmatrix(){
+	switch(state_matrix){
+		case matrix_Init:
+			state_matrix = matrix_wait;
+		break;
+		case matrix_wait:
+			if(receivedData == 0x02){//game state start;
+				state_matrix = matrix_game;
+			}
+			else{
+				PORTC = ~0x00;
+				PORTA = 0x00;	
+				state_matrix = matrix_wait;	
+			}
+				
+		break;
+		case matrix_game://lets try to do it all in one state as much as possible
+			if(strike == 3){
+				state_matrix = matrix_wait;
+				strike = 0;
+			}
+			else if(counter == 0){//outfield
+				if(left_num == 1){
+					field = field | 0x80;
+				}
+				else{
+					field = field & 0x7F;
+				}
+				if(mid_num == 1){
+					field = field | 0x10;
+				}
+				else{
+					field = field & 0xEF;
+				}
+				if(right_num == 1){
+					field = field | 0x02;
+				}
+				else{
+					field = field & 0xFD;
+				}
+				++counter;
+				PORTC = ~field; 
+				PORTA = 0x80;
+				state_matrix = matrix_game;
+			}
+			else if(counter == 1){//2nd base
+				PORTC = ~0x10; PORTA = 0x40;
+				++counter;
+				state_matrix = matrix_game;
+			}
+			else if(counter == 2){//--
+				PORTC = ~0x00; PORTA = 0x20;
+				++counter;
+				state_matrix = matrix_game;
+			}
+			else if(counter == 3){//3rd and 1st base
+				PORTC = ~0x44; PORTA = 0x10;
+				++counter;
+				state_matrix = matrix_game;
+			}
+			else if(counter == 4){//--
+				PORTC = ~0x00; PORTA = 0x08;
+				++counter;
+				state_matrix = matrix_game;
+			}
+			else if(counter == 5){//home base
+				PORTC = ~0x10; PORTA = 0x04;
+				counter = 0;
+				state_matrix = matrix_game;
+			}
+			
+		break;
+	}
+
+	switch(state_matrix){
+		case matrix_Init:
+		break;
+		case matrix_wait:
+		break;
+		case matrix_game:
+		break;
+	}
+	
+	return 0;
+}
+
+
 //////////////////////////////////////////////////////////////////////////
 
 int main(void)
 {
 	
 	DDRA = 0xFF; PORTA = 0x00;//slave //will as a output rn
-	//DDRB = 0x00; PORTB = 0xFF;//Input for the Sensor //at the moment we are using a button
+	//DDRB = DDRB & 0x0F; PORTB = PORTB & 0xF0;//Input for the Sensor //at the moment we are using a button
 	//DDRC = 0xF0; PORTC = 0x0F;//keypad
 	DDRD = 0xFF; PORTD = 0x00;//lcd data bus
 	
@@ -114,27 +463,32 @@ int main(void)
 	if(eeprom_read_byte((uint8_t*)1) == 255) {
 		eeprom_update_byte((uint8_t*)1, (uint8_t) 0);
 	}
-	score = eeprom_read_byte((uint8_t*)1);
+	hi_score = eeprom_read_byte((uint8_t*)1);
 	
-	static task task1;
-	task *tasks[] = { &task1};//, &task2};
+	static task task1, task2;
+	task *tasks[] = { &task1, &task2};
 	const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 	
 	
-	//task1 - for the sensor input
+	//task1 - for the LCD input
 	task1.state = screen_Init;
-	task1.period = 100;
+	task1.period = 50;
 	task1.elapsedTime = task1.period;
 	task1.TickFct = &SMLCD;
 
+	task2.state = matrix_Init;
+	task2.period = 1;
+	task2.elapsedTime = task2.period;
+	task2.TickFct = &SMmatrix;
 
 /*Initializations*/
-	TimerSet(100);
+	TimerSet(1);
 	TimerOn();
 	SPI_SlaveInit();
 	LCD_init();
-	LCD_DisplayString(1, "Okay B0omer: ");
-	LCD_WriteData(score +'0');
+	LCD_DisplayString(1, "Oh! That's a    Baseball L2Start");
+	//LCD_DisplayString(1, "Score: 0        Strikes: 0");
+	//LCD_WriteData(score +'0');
 	
 	
 	unsigned short i;
@@ -144,7 +498,7 @@ int main(void)
 				tasks[i]->state = tasks[i]->TickFct(tasks[i]->state);
 				tasks[i]->elapsedTime = 0;
 			}
-			tasks[i]->elapsedTime += 100; //value is gcd
+			tasks[i]->elapsedTime += 1; //value is gcd
 		}
 		while(!TimerFlag);
 		TimerFlag = 0;
