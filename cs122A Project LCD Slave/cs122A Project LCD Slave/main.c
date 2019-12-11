@@ -27,10 +27,15 @@ typedef struct _task{
 char outfield[] = {1,1,1,  0,1,1,  1,1,0,  1,0,1,   1,1,0,  1,1,1,    0,0,1, 1,1,1, 1,0,1, 0,1,0, 1,1,1, 0,1,1, 0,1,1, 1,1,1, 1,0,1, 1,1,1, 0,1,1, 0,1,0, 1,0,1, 0,1,0, 1,1,1, 0,0,1, 1,0,0};
 				// 0 1 2  3 4 5  6 7 8  9 10 11
 //char outfield[] = {1,1,1};
+char points[] = {   1,       1,      2,     1,        1,     1,        3,      1,     2,    3,     1,     1,    2,       1,     1,    1,       1,   3,      1,    3,      1,     3,     3 };
+
 unsigned char outter = 0;// no bigger than 22
+unsigned char cycle = 0;
 
 unsigned char score = 0;
+unsigned char score_2 = 0;
 unsigned char hi_score = 0;
+unsigned char hi_score_2 = 0;
 
 unsigned char left_num = 0;	//outfield[outter];
 unsigned char mid_num =	0;	//outfield[outter + 1];
@@ -63,7 +68,8 @@ if(home_base == 1){
 }
 
 */
-enum SM1_states{screen_Init, screen_wait, screen_increase, screen_decrease};
+unsigned char pointer = 0;
+enum SM1_states{screen_Init, screen_wait, screen_increase, screen_decrease, screen_point};
 int SMLCD(int state){
 	switch(state){
 		case screen_Init:
@@ -112,12 +118,16 @@ int SMLCD(int state){
 				receivedData = 0x00;
 				if(left_num == 0){//foul
 					strike += 1;
+					cycle += 1;
+					if(cycle > 22){
+						cycle = 0;
+					}
 					LCD_Cursor(26);
 					LCD_WriteData(strike + '0');
 					state = screen_decrease;
 				}
-				else{//point 
-					++first_base;
+				else{/////////////////////////////////////////////////////////////////////////////////point 
+					/*++first_base;
 					if(first_base == 2){
 						first_base = 1;
 						++second_base;
@@ -127,17 +137,19 @@ int SMLCD(int state){
 						++third_base;
 					}
 					if(third_base == 2){
-						third_base = 0;
+						third_base = 1;
 						++home_base;
 					}
 					if(home_base == 1){
 						++score;
 						home_base = 0;
-					}
+					}*/
+					
 					//score += 1;
-					LCD_Cursor(8);
-					LCD_WriteData(score + '0');
-					state = screen_increase;
+					//LCD_Cursor(8);
+					//LCD_WriteData(score + '0');
+					//state = screen_increase;
+					state = screen_point;
 				}
 				
 				outter += 3;
@@ -165,10 +177,14 @@ int SMLCD(int state){
 					strike += 1;
 					LCD_Cursor(26);
 					LCD_WriteData(strike + '0');
+					cycle += 1;
+					if(cycle > 22){
+						cycle = 0;
+					}
 					state = screen_decrease;
 				}
 				else{
-					++first_base;
+					/*++first_base;
 					if(first_base == 2){
 						first_base = 1;
 						++second_base;
@@ -178,7 +194,7 @@ int SMLCD(int state){
 						++third_base;
 					}
 					if(third_base == 2){
-						third_base = 0;
+						third_base = 1;
 						++home_base;
 					}
 					if(home_base == 1){
@@ -187,8 +203,8 @@ int SMLCD(int state){
 					}					
 					//score += 1;
 					LCD_Cursor(8);
-					LCD_WriteData(score + '0');
-					state = screen_increase;
+					LCD_WriteData(score + '0');*/
+					state = screen_point;
 				}
 				
 				outter += 3;
@@ -215,9 +231,13 @@ int SMLCD(int state){
 					LCD_Cursor(26);
 					LCD_WriteData(strike + '0');
 					state = screen_decrease;
+					cycle += 1;
+					if(cycle > 22){
+						cycle = 0;
+					}
 				}
 				else{
-					++first_base;
+					/*++first_base;
 					if(first_base == 2){
 						first_base = 1;
 						++second_base;
@@ -227,7 +247,7 @@ int SMLCD(int state){
 						++third_base;
 					}
 					if(third_base == 2){
-						third_base = 0;
+						third_base = 1;
 						++home_base;
 					}
 					if(home_base == 1){
@@ -236,8 +256,8 @@ int SMLCD(int state){
 					}
 					//score += 1;
 					LCD_Cursor(8);
-					LCD_WriteData(score + '0');
-					state = screen_increase;
+					LCD_WriteData(score + '0');*/
+					state = screen_point;
 				}
 				outter += 3;
 				if(outter > 66 ){
@@ -323,6 +343,104 @@ int SMLCD(int state){
 			
 			return state;
 		break;
+		
+		case screen_point:
+		if(points[cycle] == 1){
+				//only for one baser
+				//second base = 1 //first base = 0
+				//second = 2 first = 1 // second = 0 // third = 1
+				
+				//now second first = 1 and third = 1 and second = 0
+				//first = 2 then third = 2 = > second = 1 and third =0
+
+				//check the bases first
+				if(third_base == 1){
+					third_base = 0;
+					++score;
+				}
+				if(second_base == 1){
+					second_base = 0;
+					third_base = 1;
+				}
+				if(first_base == 1){
+					first_base = 0;
+					second_base = 1;
+				}
+				
+				if(first_base == 0){
+					first_base = 1;
+				}
+
+			
+				LCD_Cursor(8);
+				LCD_WriteData(score + '0');
+				home_base = 0;
+		}
+		else if(points[cycle] == 2){//double
+				//empty board senario
+				//first = 2 so only second should be up
+				
+				//second = 1; 
+				//first = 2 then = 0; then second = 1
+				//first = 1 at this moment				
+				//check who is on the board first
+				if(third_base == 1){
+					third_base =0;
+					++score;
+				}
+				if(second_base == 1){//someone already on the second base then add a score
+					second_base = 0;
+					++score;
+				}
+
+				if(first_base == 1){//someone already on the first base
+					first_base = 0;
+					third_base = 1;
+				}
+
+				
+				//now add someone on second base
+				
+				if(second_base == 0){
+					second_base = 1;
+				}
+				LCD_Cursor(8);
+				LCD_WriteData(score + '0');
+				home_base = 0;
+		}
+		else if(points[cycle] == 3){//double
+			
+			
+			if(third_base == 1){
+				++score;
+				third_base = 0;
+			}
+			if(second_base == 1){
+				++score;
+				second_base = 0;
+			}
+			if(first_base == 1){
+				first_base = 0;
+				++score;
+			}
+			//now add someone on second base
+			
+			if(third_base == 0){
+				third_base = 1;
+			}
+				LCD_Cursor(8);
+				LCD_WriteData(score + '0');
+				home_base = 0;
+			
+		}
+		++cycle;
+		if(cycle > 22){
+			cycle = 0;
+		}
+		state = screen_increase;
+		
+		
+		break;
 	};
 
 	switch(state){
@@ -336,6 +454,9 @@ int SMLCD(int state){
 		break;
 		
 		case screen_decrease:
+		break;
+		case screen_point:
+		
 		break;
 	};
 
@@ -360,6 +481,7 @@ PORTC = ~0x10; PORTA = 0x04;
 */
 unsigned char counter = 0;
 unsigned char field = 0x00;
+unsigned char second_first = 0x00;
 enum SM2_states{matrix_Init, matrix_wait, matrix_game}state_matrix;
 int SMmatrix(){
 	switch(state_matrix){
@@ -373,6 +495,9 @@ int SMmatrix(){
 			else{
 				PORTC = ~0x00;
 				PORTA = 0x00;	
+				first_base =0;
+				second_base = 0;
+				third_base = 0;
 				state_matrix = matrix_wait;	
 			}
 				
@@ -407,7 +532,14 @@ int SMmatrix(){
 				state_matrix = matrix_game;
 			}
 			else if(counter == 1){//2nd base
-				PORTC = ~0x10; PORTA = 0x40;
+				if(second_base >0){
+					PORTC = ~0x10;
+				}
+				else{
+					PORTC = ~ 0x00;
+				}
+				//PORTC = ~0x10; 
+				PORTA = 0x40;
 				++counter;
 				state_matrix = matrix_game;
 			}
@@ -417,17 +549,49 @@ int SMmatrix(){
 				state_matrix = matrix_game;
 			}
 			else if(counter == 3){//3rd and 1st base
-				PORTC = ~0x44; PORTA = 0x10;
+				if(first_base > 0){
+					second_first =  second_first | 0x04;
+				}
+				else{
+					second_first = second_first & 0xFB;
+				}
+				if(third_base >0){
+					second_first = second_first | 0x40;
+				}
+				else{
+					second_first = second_first & 0xBF;
+				}
+				if(points[cycle] >= 3){
+					second_first = second_first | 0x01;
+					
+				}
+				else{
+					second_first = second_first & 0xFE;
+				}
+				PORTC = ~second_first;//~0x44;
+				PORTA = 0x10;
 				++counter;
 				state_matrix = matrix_game;
 			}
 			else if(counter == 4){//--
-				PORTC = ~0x00; PORTA = 0x08;
+				if(points[cycle] >= 2){
+					PORTC = ~0x01;
+				}
+				else{
+					PORTC = ~0x00; 	
+				}
+				PORTA = 0x08;
 				++counter;
 				state_matrix = matrix_game;
 			}
 			else if(counter == 5){//home base
-				PORTC = ~0x10; PORTA = 0x04;
+				if(points[cycle] >= 1){
+					PORTC = ~0x11;
+				}
+				else{
+					PORTC = ~0x10; 	
+				}
+				PORTA = 0x04;
 				counter = 0;
 				state_matrix = matrix_game;
 			}
@@ -463,8 +627,12 @@ int main(void)
 	if(eeprom_read_byte((uint8_t*)1) == 255) {
 		eeprom_update_byte((uint8_t*)1, (uint8_t) 0);
 	}
+	if(eeprom_read_byte((uint8_t*)4) == 255) {
+		eeprom_update_byte((uint8_t*)4, (uint8_t) 0);
+	}
+		
 	hi_score = eeprom_read_byte((uint8_t*)1);
-	
+	hi_score_2 = eeprom_read_byte((uint8_t*)4);
 	static task task1, task2;
 	task *tasks[] = { &task1, &task2};
 	const unsigned short numTasks = sizeof(tasks)/sizeof(task*);

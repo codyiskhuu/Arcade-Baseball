@@ -28,6 +28,7 @@ unsigned char data_in;
 #define left (~PINB & 0x01) // start/left
 #define rightt (~PINC & 0x01) // right
 #define motor (~PINC & 0x08)
+#define relay (~PINC & 0x10)
 
 #define sensor_1 PINB & 0x04 // outfield left
 #define sensor_2 PINB & 0x08 // strike
@@ -65,9 +66,13 @@ int SMbluetooth(){
 				out = out | 0x01;//turn the first digit off
 				state_blue = bluetooth_receive;
 			}*/
-			if(!USART_HasReceived(0)){//when we do not receive a signal from the PI
+			if(relay){
+				sensor_counter = 0;	
+				out = out | 0x01;
+				state_blue = bluetooth_receive;				
+			}
+			else if(!USART_HasReceived(0)){//when we do not receive a signal from the PI
 				USART_Flush(0);//flush USART at pin 0 so we don't stay in the it 
-				
 				state_blue = bluetooth_wait;
 			}
 			else{//we get the signal and trigger the solenoid
@@ -421,7 +426,75 @@ int SMSensor(){
 	return 0;
 }
 
+//////////////////////////////////////////////////////////////////////////
+unsigned char motor_time = 0;
+enum SM4_states{motor_Init, motor_wait, motor_up, motor_down}state_motor;
+int SMmotor(){
+	switch(state_motor){
+		case motor_Init:
+			DDRD |= (1<<PD5);	/* Make OC1A pin as output */
+			TCNT1 = 0;		/* Set timer1 count zero */
+			ICR1 = 2499;		/* Set TOP count for timer1 in ICR1 register */
 
+			/* Set Fast PWM, TOP in ICR1, Clear OC1A on compare match, clk/64 */
+			TCCR1A = (1<<WGM11)|(1<<COM1A1);
+			TCCR1B = (1<<WGM12)|(1<<WGM13)|(1<<CS10)|(1<<CS11);
+			state_motor = motor_wait;
+		break;
+		case motor_wait:
+			if(motor){
+				state_motor = motor_up;
+			}
+			else{
+				state_motor = motor_wait;
+			}		
+		break;
+		
+		case motor_up:
+			if(motor_time < 14){
+				OCR1A = 70;
+				++motor_time;
+			}
+			else{
+				motor_time = 0;
+				state_motor = motor_down;
+			}
+			
+		break;
+		
+		case motor_down:
+			if(motor_time < 14){
+				OCR1A = 175;
+				++motor_time;
+			}
+			else{
+				motor_time = 0;
+				state_motor = motor_wait;
+			}
+		break;
+		
+	};
+
+	switch(state_motor){
+		case motor_Init:
+		
+		break;
+		
+		case motor_wait:
+		
+		break;
+		
+		case motor_up:
+		
+		break;
+		
+		case motor_down:
+		
+		break;
+		
+	};
+	
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -432,12 +505,12 @@ int main(void)
 	DDRB = 0x00; PORTB = 0xFF;// PORTB input
 	DDRC = 0x00; PORTC = 0xFF;
 	
-	static task task1 ,task2, task3;
-	task *tasks[] = { &task1 ,&task2, &task3 };
+	static task task1 ,task2, task3;//, task4;
+	task *tasks[] = { &task1 ,&task2, &task3};//, &task4};
 	const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 
 	
-	//task1 - for the bluetooth input
+	//task1 - for the blue tooth input
 	task1.state = bluetooth_Init;
 	task1.period = 100;
 	task1.elapsedTime = task1.period;
@@ -454,8 +527,12 @@ int main(void)
 	task3.period = 100;
 	task3.elapsedTime = task3.period;
 	task3.TickFct = &SMSensor;
-
-
+	/*
+	//task4 - for the motor
+	task4.state = motor_Init;
+	task4.period = 100;
+	task4.elapsedTime = task4.period;
+	task4.TickFct = &SMmotor;*.
 
 
 	/*Initializations*/
@@ -465,6 +542,7 @@ int main(void)
 	initUSART(0);//using usart port 0
 	game_state = 0x01;
 	SPI_MasterTransmit(game_state);
+
 	//////////////////////////////////////////////////////////////////////////
 	unsigned short i;
 	while(1){
