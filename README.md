@@ -1,1 +1,1 @@
-# CS122a-Project
+# Aracade Baseball Machine
